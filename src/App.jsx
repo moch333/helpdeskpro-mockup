@@ -50,7 +50,14 @@ function saveTickets(list) {
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify(list)) } catch (e) { /* noop */ }
 }
 function getSessionUser() {
-  try { return localStorage.getItem(SESSION_KEY) || null } catch (e) { return null }
+  try {
+    const stored = localStorage.getItem(SESSION_KEY)
+    // Limpia sesiones de un formato anterior (p.ej. el viejo valor "1")
+    // que ya no corresponde a ningún usuario válido de la lista actual.
+    if (stored && VALID_USERS.some((u) => u.user === stored)) return stored
+    if (stored) localStorage.removeItem(SESSION_KEY)
+    return null
+  } catch (e) { return null }
 }
 function setSessionUser(username) {
   try {
