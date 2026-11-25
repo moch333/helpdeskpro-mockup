@@ -5,7 +5,9 @@ const SESSION_KEY = 'helpdeskpro_session_v1'
 const VALID_USER = 'supervisor'
 const VALID_PASS = 'demo2026'
 
-const defaultTickets = [
+// slaMin = minutos de SLA restante AL MOMENTO de cargar/reiniciar el tablero.
+// A partir de ahí, el SLA cuenta hacia atrás en tiempo real (ver makeDefaultTickets).
+const defaultTicketSeeds = [
   { id: 'TKT-1001', empresa: 'Grupo Alfa', descripcion: 'No enciende la laptop corporativa', prioridad: 'Critica', slaMin: 12, estado: 'Abierto', tecnico: 'J. Pérez' },
   { id: 'TKT-1002', empresa: 'Constructora Beta', descripcion: 'Error al imprimir reportes mensuales', prioridad: 'Media', slaMin: 340, estado: 'Abierto', tecnico: 'L. Gómez' },
   { id: 'TKT-1003', empresa: 'Grupo Alfa', descripcion: 'Solicitud de acceso a VPN', prioridad: 'Baja', slaMin: 980, estado: 'Resuelto', tecnico: 'L. Gómez' },
@@ -13,12 +15,28 @@ const defaultTickets = [
   { id: 'TKT-1005', empresa: 'Comercial Omega', descripcion: '(sin descripción capturada)', prioridad: 'Media', slaMin: 60, estado: 'Abierto', tecnico: '—' },
 ]
 
+// Convierte los minutos semilla en una fecha límite real (createdAt + slaMin),
+// igual que en el diseño real: sla_limite = {{$now.plus({minutes: X})}}.
+function makeDefaultTickets() {
+  const now = Date.now()
+  return defaultTicketSeeds.map((seed) => ({
+    ...seed,
+    createdAt: now,
+    slaLimite: now + seed.slaMin * 60000,
+  }))
+}
+
 function loadTickets() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
-    if (raw) return JSON.parse(raw)
+    if (raw) {
+      const parsed = JSON.parse(raw)
+      // Si el tablero guardado es de una versión anterior (sin slaLimite),
+      // se regenera con fechas límite nuevas en vez de romper.
+      if (Array.isArray(parsed) && parsed.length && parsed[0].slaLimite) return parsed
+    }
   } catch (e) { /* noop */ }
-  return defaultTickets.slice()
+  return makeDefaultTickets()
 }
 function saveTickets(list) {
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify(list)) } catch (e) { /* noop */ }
@@ -55,6 +73,14 @@ export default function App() {
   const [toast, setToast] = useState(null)
   const toastTimer = useRef(null)
 
+  // Fuerza un re-render cada 15s para que el SLA restante cuente hacia atrás
+  // en tiempo real (el valor en sí se calcula al vuelo contra Date.now()).
+  const [, forceTick] = useState(0)
+  useEffect(() => {
+    const iv = setInterval(() => forceTick((x) => x + 1), 15000)
+    return () => clearInterval(iv)
+  }, [])
+
   useEffect(() => { saveTickets(tickets) }, [tickets])
 
   function showToast(msg) {
@@ -83,8 +109,7 @@ export default function App() {
   }
 
   function handleResetBoard() {
-    const fresh = defaultTickets.slice()
-    setTickets(fresh)
+    setTickets(makeDefaultTickets())
     showToast('Tablero reiniciado')
   }
 
@@ -187,7 +212,16 @@ export default function App() {
             </thead>
             <tbody id="tickets-body">
               {tickets.map((t) => {
-                const slaClass = t.slaMin <= 30 ? 'sla-risk' : 'sla-ok'
+                const now = Date.now()
+                const totalMs = t.slaLimite - t.createdAt
+                const remainingMs = t.slaLimite - now
+                const remainingMin = Math.round(remainingMs / 60000)
+                const percentRemaining = totalMs > 0 ? (remainingMs / totalMs) * 100 : 0
+                const expired = remainingMs <= 0
+                // Mismo umbral que el workflow de monitoreo: riesgo si queda <=20% del SLA, o ya venció.
+                const atRisk = expired || percentRemaining <= 20
+                const slaClass = atRisk ? 'sla-risk' : 'sla-ok'
+                const slaText = expired ? 'Vencido' : remainingMin + ' min'
                 return (
                   <tr key={t.id} data-ticket-id={t.id}>
                     <td className="col-folio">{t.id}</td>
@@ -197,7 +231,7 @@ export default function App() {
                       <span className={'badge ' + prioridadClass(t.prioridad)}>{t.prioridad}</span>
                     </td>
                     <td className="col-sla">
-                      <span className={slaClass}>{t.slaMin} min</span>
+                      <span className={slaClass}>{slaText}</span>
                     </td>
                     <td className="col-estado">
                       <span className={'badge estado ' + estadoClass(t.estado)}>{t.estado}</span>
