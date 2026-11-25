@@ -208,11 +208,6 @@ export default function App() {
               </div>
               <button type="submit" id="btn-login">Entrar</button>
             </form>
-            <div className="hint">
-              Usuarios de prueba: {VALID_USERS.map((u) => (
-                <code key={u.user}>{u.user}/{u.pass}</code>
-              )).reduce((acc, el, i) => (i === 0 ? [el] : [...acc, ' · ', el]), [])}
-            </div>
           </div>
         </div>
       )}

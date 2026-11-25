@@ -12,7 +12,16 @@ mockup original, para que los selectores de UiPath (`#username`, `#password`,
 `#detail-estado`, `#detail-tecnico`, `#detail-nota`, `#btn-guardar-detalle`,
 etc.) sigan funcionando sin cambios.
 
-**Credenciales de prueba:** usuario `supervisor`, contraseña `demo2026`.
+**Credenciales de prueba** (no se muestran en la interfaz, solo aquí — igual
+que el Asset `HelpDeskPro_Credentials` en Orchestrator, que tampoco es visible
+para el robot, solo consumido):
+
+| Usuario | Contraseña | Rol | Pensado para |
+|---|---|---|---|
+| `supervisor` | `demo2026` | Supervisor | Flujo principal de escalamiento (UiPath) |
+| `tecnico1` | `tecnico2026` | Técnico | Pruebas de reasignación/gestión de ticket |
+| `admin` | `admin2026` | Administrador | Pruebas de acceso elevado / configuración |
+| `auditor` | `auditor2026` | Auditor (solo lectura) | Casos de prueba de solo consulta |
 
 ## 1. Probarlo en local
 
