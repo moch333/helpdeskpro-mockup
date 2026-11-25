@@ -2,8 +2,16 @@ import { useEffect, useRef, useState } from 'react'
 
 const STORAGE_KEY = 'helpdeskpro_tickets_v1'
 const SESSION_KEY = 'helpdeskpro_session_v1'
-const VALID_USER = 'supervisor'
-const VALID_PASS = 'demo2026'
+
+// Credenciales válidas de HelpDeskPro. En Orchestrator cada una correspondería
+// a su propio Asset tipo Credential (p.ej. HelpDeskPro_Credentials_Supervisor),
+// según qué robot/caso de prueba la use.
+const VALID_USERS = [
+  { user: 'supervisor', pass: 'demo2026', nombre: 'Supervisor', rol: 'Supervisor' },
+  { user: 'tecnico1', pass: 'tecnico2026', nombre: 'J. Pérez', rol: 'Técnico' },
+  { user: 'admin', pass: 'admin2026', nombre: 'Administrador', rol: 'Administrador' },
+  { user: 'auditor', pass: 'auditor2026', nombre: 'Auditoría', rol: 'Auditor (solo lectura)' },
+]
 
 // slaMin = minutos de SLA restante AL MOMENTO de cargar/reiniciar el tablero.
 // A partir de ahí, el SLA cuenta hacia atrás en tiempo real (ver makeDefaultTickets).
@@ -41,12 +49,12 @@ function loadTickets() {
 function saveTickets(list) {
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify(list)) } catch (e) { /* noop */ }
 }
-function isLoggedIn() {
-  try { return localStorage.getItem(SESSION_KEY) === '1' } catch (e) { return false }
+function getSessionUser() {
+  try { return localStorage.getItem(SESSION_KEY) || null } catch (e) { return null }
 }
-function setLoggedInStorage(v) {
+function setSessionUser(username) {
   try {
-    if (v) localStorage.setItem(SESSION_KEY, '1')
+    if (username) localStorage.setItem(SESSION_KEY, username)
     else localStorage.removeItem(SESSION_KEY)
   } catch (e) { /* noop */ }
 }
@@ -59,7 +67,8 @@ function estadoClass(e) {
 }
 
 export default function App() {
-  const [loggedIn, setLoggedIn] = useState(isLoggedIn())
+  const [sessionUser, setSessionUserState] = useState(getSessionUser())
+  const loggedIn = !!sessionUser
   const [tickets, setTickets] = useState(loadTickets())
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
@@ -91,9 +100,12 @@ export default function App() {
 
   function handleLogin(ev) {
     ev.preventDefault()
-    if (username.trim() === VALID_USER && password === VALID_PASS) {
-      setLoggedInStorage(true)
-      setLoggedIn(true)
+    const match = VALID_USERS.find(
+      (u) => u.user === username.trim() && u.pass === password
+    )
+    if (match) {
+      setSessionUser(match.user)
+      setSessionUserState(match.user)
       setLoginError(false)
     } else {
       setLoginError(true)
@@ -101,12 +113,14 @@ export default function App() {
   }
 
   function handleLogout() {
-    setLoggedInStorage(false)
-    setLoggedIn(false)
+    setSessionUser(null)
+    setSessionUserState(null)
     setUsername('')
     setPassword('')
     setLoginError(false)
   }
+
+  const currentUser = VALID_USERS.find((u) => u.user === sessionUser) || null
 
   function handleResetBoard() {
     setTickets(makeDefaultTickets())
@@ -144,9 +158,11 @@ export default function App() {
     <>
       <header>
         <div className="brand"><span className="logo">HD</span> HelpDeskPro</div>
-        {loggedIn && (
+        {loggedIn && currentUser && (
           <div id="header-session">
-            <span className="session-info" id="session-user-label">Sesión: {VALID_USER}</span>
+            <span className="session-info" id="session-user-label">
+              Sesión: {currentUser.user} ({currentUser.rol})
+            </span>
             <button id="btn-logout" onClick={handleLogout}>Cerrar sesión</button>
           </div>
         )}
@@ -185,6 +201,11 @@ export default function App() {
               </div>
               <button type="submit" id="btn-login">Entrar</button>
             </form>
+            <div className="hint">
+              Usuarios de prueba: {VALID_USERS.map((u) => (
+                <code key={u.user}>{u.user}/{u.pass}</code>
+              )).reduce((acc, el, i) => (i === 0 ? [el] : [...acc, ' · ', el]), [])}
+            </div>
           </div>
         </div>
       )}
